@@ -300,6 +300,18 @@ function joinGame() {
   });
   sock.on('server_shutdown', () => { addKF('服务器正在重启...'); });
   sock.on('error_msg', d => { addKF(d.msg); });
+  sock.on('disconnect', () => {
+    addKF('连接断开，正在重连...');
+    document.getElementById('deathOverlay').classList.remove('show');
+  });
+  sock.on('reconnect', () => {
+    addKF('重新连接成功!');
+    sock.emit('join', { name: document.getElementById('nameInput').value.trim() || '无名海盗' });
+  });
+  sock.on('connect_error', () => {
+    addKF('连接失败，正在重试...');
+  });
+
 
   sock.emit('join', { name });
 }
@@ -448,6 +460,20 @@ function render() {
   const gs = 100, sx0 = -cx%gs, sy0 = -cy%gs;
   for (let x=sx0;x<w;x+=gs){X.beginPath();X.moveTo(x,0);X.lineTo(x,h);X.stroke();}
   for (let y=sy0;y<h;y+=gs){X.beginPath();X.moveTo(0,y);X.lineTo(w,y);X.stroke();}
+  // Water waves
+  X.strokeStyle = 'rgba(26, 74, 110, 0.08)';
+  X.lineWidth = 1.5;
+  const waveT = gs ? gs.tick * 0.02 : 0;
+  for (let wy = -200; wy < h + 200; wy += 40) {
+    X.beginPath();
+    for (let wx = -100; wx < w + 100; wx += 20) {
+      const wy2 = wy + Math.sin((wx + cx * 0.3) * 0.01 + waveT + wy * 0.05) * 8;
+      if (wx === -100) X.moveTo(wx, wy2);
+      else X.lineTo(wx, wy2);
+    }
+    X.stroke();
+  }
+
 
   // Islands
   for (const isl of islands) {
