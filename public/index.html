@@ -503,9 +503,9 @@ function render() {
   X.beginPath(); X.moveTo(0,h*.35); X.lineTo(w,h*.35); X.stroke();
   // Grid
   X.strokeStyle = 'rgba(26,74,110,.15)'; X.lineWidth = 1;
-  const gs = 100, sx0 = -cx%gs, sy0 = -cy%gs;
-  for (let x=sx0;x<w;x+=gs){X.beginPath();X.moveTo(x,0);X.lineTo(x,h);X.stroke();}
-  for (let y=sy0;y<h;y+=gs){X.beginPath();X.moveTo(0,y);X.lineTo(w,y);X.stroke();}
+  const gridSz = 100, sx0 = -cx%gridSz, sy0 = -cy%gridSz;
+  for (let x=sx0;x<w;x+=gridSz){X.beginPath();X.moveTo(x,0);X.lineTo(x,h);X.stroke();}
+  for (let y=sy0;y<h;y+=gridSz){X.beginPath();X.moveTo(0,y);X.lineTo(w,y);X.stroke();}
   // Water waves
   X.strokeStyle = 'rgba(26, 74, 110, 0.08)';
   X.lineWidth = 1.5;
