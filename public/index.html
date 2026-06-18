@@ -415,6 +415,18 @@ function drawShip(s, cx, cy, isMe) {
   X.moveTo(28,0); X.quadraticCurveTo(20,-14,-10,-12); X.lineTo(-22,-6);
   X.quadraticCurveTo(-28,0,-22,6); X.lineTo(-10,12); X.quadraticCurveTo(20,14,28,0);
   X.closePath(); X.fill();
+  // Ship wake (water trail)
+  if (Math.abs(s.vx) > 0.3 || Math.abs(s.vy) > 0.3) {
+    X.fillStyle = 'rgba(200, 230, 255, 0.15)';
+    for (let w = 0; w < 3; w++) {
+      const wx = -22 - w * 8;
+      const wy = (w - 1) * 4;
+      X.beginPath();
+      X.ellipse(wx, wy, 4 + w * 3, 2 + w, 0, 0, Math.PI * 2);
+      X.fill();
+    }
+  }
+
   // Deck
   X.strokeStyle = 'rgba(0,0,0,.2)'; X.lineWidth = 1;
   X.beginPath(); X.moveTo(20,0); X.lineTo(-18,0); X.stroke();
