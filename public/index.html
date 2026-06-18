@@ -186,7 +186,62 @@ let mouse = { x: 0, y: 0, down: false };
 let keys = {};
 let killMsgs = [];
 let wbTimer = 0;
-let lastHp = 100;
+let lastHp = 100; let prevScore = 0; let prevCannonCount = 0;
+// ============================================================
+// AUDIO ENGINE (Web Audio API)
+// ============================================================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new AudioCtx();
+}
+
+function playTone(freq, duration, type, vol, pan) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const panner = audioCtx.createStereoPanner();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol || 0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  panner.pan.value = pan || 0;
+  osc.connect(gain);
+  gain.connect(panner);
+  panner.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playNoise(duration, vol, pan) {
+  if (!audioCtx) return;
+  const bufSize = audioCtx.sampleRate * duration;
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.3));
+  const src = audioCtx.createBufferSource();
+  const gain = audioCtx.createGain();
+  const panner = audioCtx.createStereoPanner();
+  src.buffer = buf;
+  gain.gain.value = vol || 0.1;
+  panner.pan.value = pan || 0;
+  src.connect(gain);
+  gain.connect(panner);
+  panner.connect(audioCtx.destination);
+  src.start();
+}
+
+function sfxCannon(pan) { playNoise(0.3, 0.2, pan); playTone(80, 0.15, 'sine', 0.15, pan); }
+function sfxHit(pan) { playNoise(0.15, 0.12, pan); playTone(200, 0.1, 'square', 0.08, pan); }
+function sfxSink(pan) { playNoise(0.5, 0.2, pan); playTone(60, 0.4, 'sine', 0.15, pan); playTone(40, 0.6, 'sine', 0.1, pan); }
+function sfxCollect(pan) { playTone(800, 0.1, 'sine', 0.1, pan); playTone(1200, 0.15, 'sine', 0.08, pan); setTimeout(() => playTone(1600, 0.1, 'sine', 0.06, pan), 80); }
+function sfxDamage(pan) { playTone(120, 0.2, 'sawtooth', 0.12, pan); playNoise(0.1, 0.08, pan); }
+function sfxJoin() { playTone(440, 0.15, 'sine', 0.06); setTimeout(() => playTone(660, 0.15, 'sine', 0.06), 100); }
+function sfxWave() { playTone(330, 0.2, 'sine', 0.08); setTimeout(() => playTone(440, 0.2, 'sine', 0.08), 150); setTimeout(() => playTone(550, 0.3, 'sine', 0.08), 300); }
+
+
 
 function resize() { C.width = innerWidth; C.height = innerHeight; }
 addEventListener('resize', resize); resize();
@@ -209,6 +264,7 @@ document.getElementById('nameInput').addEventListener('keydown', e => { if (e.ke
 function joinGame() {
   const name = document.getElementById('nameInput').value.trim() || '无名海盗';
   sock = io();
+  initAudio();
 
   sock.on('joined', d => {
     myId = d.id; mapSize = d.mapSize; islands = d.islands;
@@ -222,7 +278,7 @@ function joinGame() {
 
   sock.on('state', d => { gs = decode(d); });
 
-  sock.on('wave_start', d => { showBanner('第 ' + d.wave + ' 波', d.isBoss ? 'BOSS: ' + d.bossName : '准备迎战!'); });
+  sock.on('wave_start', d => { sfxWave(); showBanner('第 ' + d.wave + ' 波', d.isBoss ? 'BOSS: ' + d.bossName : '准备迎战!'); });
   sock.on('wave_complete', d => { showBanner('第 ' + d.wave + ' 波', '波次清除!'); });
   sock.on('player_died', d => {
     if (d.id === myId) document.getElementById('deathOverlay').classList.add('show');
@@ -230,7 +286,7 @@ function joinGame() {
     if (p) addKF(p.name + ' 沉没了');
   });
   sock.on('player_respawn', d => { if (d.id === myId) document.getElementById('deathOverlay').classList.remove('show'); });
-  sock.on('player_joined', d => { addKF(d.name + ' 加入了战场'); });
+  sock.on('player_joined', d => { sfxJoin(); addKF(d.name + ' 加入了战场'); });
   sock.on('player_left', d => { addKF(d.name + ' 离开了'); });
   sock.on('game_over', d => { showBanner('游戏结束', '总击杀: ' + d.totalKills); });
   sock.on('winner', d => {
@@ -297,13 +353,16 @@ function loop() {
   // Send input
   const aim = Math.atan2(mouse.y - C.height/2, mouse.x - C.width/2);
   sock.emit('input', { w: keys.w||false, a: keys.a||false, s: keys.s||false, d: keys.d||false, shoot: mouse.down, aimAngle: aim });
+  // Sound: cannon fire (detect by cannonball count increase)
+  if (gs.cannonballs.length > prevCannonCount + 2) { sfxCannon(0); }
+  prevCannonCount = gs.cannonballs.length;
 
   // Camera
   cam.x += (me.x - C.width/2 - cam.x) * 0.12;
   cam.y += (me.y - C.height/2 - cam.y) * 0.12;
 
   // Shake on HP drop
-  if (me.hp < lastHp - 5) shake(6);
+  if (me.hp < lastHp - 5) { shake(6); sfxDamage(0); }
   lastHp = me.hp;
 
   // Wave banner
@@ -316,6 +375,8 @@ function loop() {
   document.getElementById('hpFill').style.width = (me.hp / me.maxHp * 100) + '%';
   document.getElementById('hpText').textContent = Math.ceil(me.hp);
   document.getElementById('scoreText').textContent = me.score;
+  if (me.score > prevScore) { sfxCollect(0); }
+  prevScore = me.score;
   document.getElementById('killsText').textContent = '击沉: ' + me.kills;
   document.getElementById('pCount').textContent = Object.keys(gs.players).length;
 
