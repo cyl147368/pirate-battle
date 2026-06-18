@@ -27,12 +27,32 @@ const TREASURE_SCORE = 50;
 const TREASURE_HP = 20;
 const ISLAND_COUNT = 10;
 const SINK_SCORE = 100;
-const RESPAWN_TIME = 180; // 3s
+const RESPAWN_TIME = 180; // 3s at 60fps
 const WIN_SCORE = 2000;
 const AI_COUNT = 4;
+const TREASURE_RESPAWN_TICKS = 180; // 3s at 60fps
+const MAX_PLAYERS = 20;
+const INPUT_RATE_LIMIT_MS = 16; // ~60fps
 
 let nextId = 1;
 const gid = () => nextId++;
+
+// ============================================================
+// LOGGING
+// ============================================================
+function log(level, msg, data = {}) {
+  const entry = {
+    ts: new Date().toISOString(),
+    level,
+    msg,
+    ...data,
+  };
+  if (level === 'error') {
+    console.error(JSON.stringify(entry));
+  } else {
+    console.log(JSON.stringify(entry));
+  }
+}
 
 // ============================================================
 // WORLD GENERATION
@@ -49,14 +69,15 @@ function makeIslands() {
   return islands;
 }
 
-function makeTreasure() {
+function makeTreasure(x, y) {
   return {
     id: gid(),
-    x: 100 + Math.random() * (MAP - 200),
-    y: 100 + Math.random() * (MAP - 200),
+    x: x !== undefined ? x : 100 + Math.random() * (MAP - 200),
+    y: y !== undefined ? y : 100 + Math.random() * (MAP - 200),
     size: 16,
     score: TREASURE_SCORE,
     hpRestore: TREASURE_HP,
+    respawnTimer: 0,
   };
 }
 
@@ -74,7 +95,7 @@ function makeShip(id, name, isAI = false) {
   const angle = Math.random() * Math.PI * 2;
   const col = isAI ? '#555' : COLORS[colorIdx++ % COLORS.length];
   return {
-    id, name: name || `Ship_${id}`, isAI, color: col,
+    id, name: String(name || 'Ship').slice(0, 16), isAI, color: col,
     x: 200 + Math.random() * (MAP - 400),
     y: 200 + Math.random() * (MAP - 400),
     angle,
@@ -83,6 +104,7 @@ function makeShip(id, name, isAI = false) {
     score: 0, kills: 0,
     input: { w: false, s: false, a: false, d: false, shoot: false, aimAngle: 0 },
     lastShot: 0,
+    lastInputTime: 0,
     isDead: false, respawnTimer: 0,
     invuln: 0,
   };
@@ -94,9 +116,9 @@ function makeShip(id, name, isAI = false) {
 const players = {};
 const aiShips = [];
 const cannonballs = [];
-const effects = []; // explosions, splashes
+const effects = [];
+let treasuresToRespawn = []; // { timer, x, y }
 
-// Spawn AI ships
 function spawnAI() {
   aiShips.length = 0;
   const names = ['Black Pearl', 'Flying Dutchman', 'Queen Anne', 'Jolly Roger'];
@@ -114,10 +136,6 @@ spawnAI();
 const dist = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-function circleIsland(cx, cy, cr, ix, iy, ir) {
-  return dist({ x: cx, y: cy }, { x: ix, y: iy }) < cr + ir;
-}
-
 function pushFromIsland(entity, island) {
   const d = dist(entity, island);
   const minD = entity.r || SHIP_RADIUS;
@@ -128,23 +146,33 @@ function pushFromIsland(entity, island) {
   }
 }
 
+function getRandomPos() {
+  for (let tries = 0; tries < 20; tries++) {
+    const x = 200 + Math.random() * (MAP - 400);
+    const y = 200 + Math.random() * (MAP - 400);
+    let safe = true;
+    for (const isl of islands) {
+      if (dist({ x, y }, isl) < isl.r + 40) { safe = false; break; }
+    }
+    if (safe) return { x, y };
+  }
+  return { x: MAP / 2, y: MAP / 2 };
+}
+
 // ============================================================
 // AI BEHAVIOR
 // ============================================================
-function updateAI(ship, dt) {
+function updateAI(ship) {
   if (ship.isDead) return;
 
-  // Find nearest target (player or treasure)
   let target = null;
   let minD = Infinity;
 
-  // Prefer treasure
   for (const t of treasures) {
     const d = dist(ship, t);
     if (d < minD) { minD = d; target = t; }
   }
 
-  // If close to a player, consider attacking
   for (const p of Object.values(players)) {
     if (p.isDead) continue;
     const d = dist(ship, p);
@@ -162,7 +190,6 @@ function updateAI(ship, dt) {
     ship.input.w = true;
     ship.input.s = false;
 
-    // Shoot at nearby players
     ship.input.shoot = false;
     for (const p of Object.values(players)) {
       if (!p.isDead && dist(ship, p) < 350) {
@@ -172,7 +199,6 @@ function updateAI(ship, dt) {
       }
     }
   } else {
-    // Wander
     ship.input.w = true;
     ship.input.a = Math.random() < 0.01;
     ship.input.d = Math.random() < 0.01;
@@ -189,8 +215,9 @@ function updateShip(ship) {
       ship.isDead = false;
       ship.hp = ship.maxHp;
       ship.invuln = 120;
-      ship.x = 200 + Math.random() * (MAP - 400);
-      ship.y = 200 + Math.random() * (MAP - 400);
+      const pos = getRandomPos();
+      ship.x = pos.x;
+      ship.y = pos.y;
     }
     return;
   }
@@ -213,27 +240,22 @@ function updateShip(ship) {
   ship.x += ship.vx;
   ship.y += ship.vy;
 
-  // Island collision
   for (const isl of islands) pushFromIsland(ship, isl);
 
-  // Map bounds
   ship.x = clamp(ship.x, SHIP_RADIUS, MAP - SHIP_RADIUS);
   ship.y = clamp(ship.y, SHIP_RADIUS, MAP - SHIP_RADIUS);
 
-  // Shooting
   if (inp.shoot) {
     const now = Date.now();
     if (now - ship.lastShot >= CANNON_CD) {
       ship.lastShot = now;
-      const a = ship.isAI ? inp.aimAngle : inp.aimAngle;
-      // Fire from ship side (offset perpendicular)
-      const perpAngle = a;
+      const a = inp.aimAngle;
       cannonballs.push({
         id: gid(),
-        x: ship.x + Math.cos(perpAngle) * (SHIP_RADIUS + 6),
-        y: ship.y + Math.sin(perpAngle) * (SHIP_RADIUS + 6),
-        vx: Math.cos(perpAngle) * CANNON_SPEED,
-        vy: Math.sin(perpAngle) * CANNON_SPEED,
+        x: ship.x + Math.cos(a) * (SHIP_RADIUS + 6),
+        y: ship.y + Math.sin(a) * (SHIP_RADIUS + 6),
+        vx: Math.cos(a) * CANNON_SPEED,
+        vy: Math.sin(a) * CANNON_SPEED,
         damage: CANNON_DMG,
         owner: ship.id,
         life: CANNON_LIFE,
@@ -243,13 +265,17 @@ function updateShip(ship) {
 }
 
 // ============================================================
-// GAME LOOP
+// GAME LOOP (60fps)
 // ============================================================
 let tick = 0;
+let gameResetPending = false;
 
 function gameLoop() {
   tick++;
   const now = Date.now();
+
+  // Pre-compute all ships array once per frame
+  const allShips = [...Object.values(players), ...aiShips];
 
   // Update all ships
   for (const s of Object.values(players)) updateShip(s);
@@ -267,21 +293,17 @@ function gameLoop() {
 
     let hit = false;
 
-    // Hit island
     for (const isl of islands) {
       if (dist(c, isl) < isl.r) { hit = true; break; }
     }
 
-    // Hit ships
     if (!hit) {
-      const allShips = [...Object.values(players), ...aiShips];
       for (const s of allShips) {
         if (s.isDead || s.id === c.owner || s.invuln > 0) continue;
         if (dist(c, s) < SHIP_RADIUS + 4) {
           s.hp -= c.damage;
           hit = true;
 
-          // Knockback
           const angle = Math.atan2(s.y - c.y, s.x - c.x);
           s.vx += Math.cos(angle) * 2;
           s.vy += Math.sin(angle) * 2;
@@ -293,36 +315,20 @@ function gameLoop() {
             s.respawnTimer = RESPAWN_TIME;
             effects.push({ type: 'sink', x: s.x, y: s.y, life: 30 });
 
-            // Score for killer
             const killer = players[c.owner] || aiShips.find(a => a.id === c.owner);
             if (killer) {
               killer.score += SINK_SCORE;
               killer.kills++;
             }
 
-            // AI respawns
-            if (s.isAI) {
-              setTimeout(() => {
-                s.isDead = false;
-                s.hp = s.maxHp;
-                s.invuln = 120;
-                s.x = 200 + Math.random() * (MAP - 400);
-                s.y = 200 + Math.random() * (MAP - 400);
-              }, 3000);
-            }
+            // AI respawn is now tick-based via respawnTimer
           }
           break;
         }
       }
     }
 
-    if (c.life <= 0 || hit) {
-      cannonballs.splice(i, 1);
-      continue;
-    }
-
-    // Out of map
-    if (c.x < 0 || c.x > MAP || c.y < 0 || c.y > MAP) {
+    if (c.life <= 0 || hit || c.x < 0 || c.x > MAP || c.y < 0 || c.y > MAP) {
       cannonballs.splice(i, 1);
     }
   }
@@ -330,7 +336,6 @@ function gameLoop() {
   // Treasure collection
   for (let i = treasures.length - 1; i >= 0; i--) {
     const t = treasures[i];
-    const allShips = [...Object.values(players), ...aiShips];
     for (const s of allShips) {
       if (s.isDead) continue;
       if (dist(s, t) < SHIP_RADIUS + t.size) {
@@ -338,10 +343,19 @@ function gameLoop() {
         s.hp = Math.min(s.maxHp, s.hp + t.hpRestore);
         effects.push({ type: 'collect', x: t.x, y: t.y, life: 20 });
         treasures.splice(i, 1);
-        // Respawn treasure
-        setTimeout(() => treasures.push(makeTreasure()), 3000);
+        // Queue respawn with tick-based timer
+        treasuresToRespawn.push({ timer: TREASURE_RESPAWN_TICKS });
         break;
       }
+    }
+  }
+
+  // Treasure respawn (tick-based)
+  for (let i = treasuresToRespawn.length - 1; i >= 0; i--) {
+    treasuresToRespawn[i].timer--;
+    if (treasuresToRespawn[i].timer <= 0) {
+      treasures.push(makeTreasure());
+      treasuresToRespawn.splice(i, 1);
     }
   }
 
@@ -351,75 +365,121 @@ function gameLoop() {
     if (effects[i].life <= 0) effects.splice(i, 1);
   }
 
-  // Build snapshot
+  // Build snapshot (compact to reduce bandwidth)
   const snapshot = {
-    players: {},
-    ai: aiShips.map(s => ({
-      id: s.id, name: s.name, x: s.x, y: s.y, angle: s.angle,
-      hp: s.hp, maxHp: s.maxHp, color: s.color, score: s.score,
-      isDead: s.isDead, invuln: s.invuln,
+    p: {}, // players
+    a: aiShips.map(s => ({
+      id: s.id, n: s.name, x: Math.round(s.x), y: Math.round(s.y),
+      a: +s.angle.toFixed(2), hp: Math.round(s.hp), mhp: s.maxHp,
+      c: s.color, sc: s.score, d: s.isDead ? 1 : 0, inv: s.invuln,
     })),
-    cannonballs: cannonballs.map(c => ({ x: c.x, y: c.y })),
-    treasures: treasures.map(t => ({ x: t.x, y: t.y, id: t.id })),
-    effects,
-    islands,
-    tick,
-    mapSize: MAP,
+    b: cannonballs.map(c => ({ x: Math.round(c.x), y: Math.round(c.y) })),
+    t: treasures.map(t => ({ x: Math.round(t.x), y: Math.round(t.y), id: t.id })),
+    e: effects.map(e => ({ t: e.type, x: Math.round(e.x), y: Math.round(e.y), l: e.life })),
+    w: gameState.wave || 0,
+    ws: gameState.waveState || 'waiting',
+    ea: gameState.enemiesAlive || 0,
+    tk: gameState.totalKills || 0,
+    k: tick,
+    ms: MAP,
   };
 
   for (const p of Object.values(players)) {
-    snapshot.players[p.id] = {
-      id: p.id, name: p.name, x: p.x, y: p.y, angle: p.angle,
-      vx: p.vx, vy: p.vy,
-      hp: p.hp, maxHp: p.maxHp, color: p.color,
-      score: p.score, kills: p.kills,
-      isDead: p.isDead, respawnTimer: p.respawnTimer,
-      invuln: p.invuln,
+    snapshot.p[p.id] = {
+      id: p.id, n: p.name, x: Math.round(p.x), y: Math.round(p.y),
+      a: +p.angle.toFixed(2), vx: +p.vx.toFixed(2), vy: +p.vy.toFixed(2),
+      hp: Math.round(p.hp), mhp: p.maxHp, c: p.color,
+      sc: p.score, kl: p.kills,
+      d: p.isDead ? 1 : 0, rt: p.respawnTimer, inv: p.invuln,
+      dmg: p.damage,
     };
   }
 
   io.emit('state', snapshot);
 
   // Check win
-  for (const p of Object.values(players)) {
-    if (p.score >= WIN_SCORE) {
-      io.emit('winner', { id: p.id, name: p.name, score: p.score });
-      // Reset after 5s
-      setTimeout(resetGame, 5000);
-      break;
+  if (!gameResetPending) {
+    for (const p of Object.values(players)) {
+      if (p.score >= WIN_SCORE) {
+        gameResetPending = true;
+        io.emit('winner', { id: p.id, name: p.name, score: p.score });
+        log('info', 'winner', { name: p.name, score: p.score });
+        setTimeout(() => {
+          resetGame();
+          gameResetPending = false;
+        }, 5000);
+        break;
+      }
     }
   }
 }
 
+const gameState = { wave: 0, waveState: 'waiting', enemiesAlive: 0, totalKills: 0 };
+
 setInterval(gameLoop, 1000 / TICK);
+
+// ============================================================
+// INPUT VALIDATION
+// ============================================================
+function sanitizeInput(data) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    w: !!data.w,
+    a: !!data.a,
+    s: !!data.s,
+    d: !!data.d,
+    shoot: !!data.shoot,
+    aimAngle: typeof data.aimAngle === 'number' ? data.aimAngle : 0,
+  };
+}
 
 // ============================================================
 // SOCKET EVENTS
 // ============================================================
 io.on('connection', (socket) => {
+  log('info', 'connection', { id: socket.id });
+
   socket.on('join', (data) => {
-    const ship = makeShip(socket.id, data.name);
+    if (Object.keys(players).length >= MAX_PLAYERS) {
+      socket.emit('error_msg', { msg: '服务器已满' });
+      socket.disconnect();
+      return;
+    }
+    const name = (data && data.name) ? String(data.name).slice(0, 16) : 'Pirate';
+    const ship = makeShip(socket.id, name);
     players[socket.id] = ship;
     socket.emit('joined', {
       id: socket.id, mapSize: MAP, islands, winScore: WIN_SCORE,
     });
     io.emit('player_joined', { id: socket.id, name: ship.name });
-    console.log(`${ship.name} joined (${Object.keys(players).length} players)`);
+    log('info', 'player_joined', { name: ship.name, total: Object.keys(players).length });
   });
 
   socket.on('input', (data) => {
     const p = players[socket.id];
     if (!p) return;
-    p.input = { ...p.input, ...data };
+
+    // Rate limiting
+    const now = Date.now();
+    if (now - p.lastInputTime < INPUT_RATE_LIMIT_MS) return;
+    p.lastInputTime = now;
+
+    const sanitized = sanitizeInput(data);
+    if (sanitized) {
+      p.input = { ...p.input, ...sanitized };
+    }
   });
 
   socket.on('restart', () => {
     const p = players[socket.id];
     if (p) {
-      p.score = 0; p.kills = 0; p.hp = SHIP_MAX_HP;
+      p.score = 0; p.kills = 0; p.hp = SHIP_MAX_HP; p.maxHp = SHIP_MAX_HP;
       p.isDead = false; p.invuln = 120;
-      p.x = 200 + Math.random() * (MAP - 400);
-      p.y = 200 + Math.random() * (MAP - 400);
+      const pos = getRandomPos();
+      p.x = pos.x; p.y = pos.y;
+      p.damage = CANNON_DMG;
+      p.fireRate = CANNON_CD;
+      p.upgrades = { damage: 0, speed: 0, hp: 0, fireRate: 0, range: 0 };
     }
   });
 
@@ -428,25 +488,76 @@ io.on('connection', (socket) => {
     if (p) {
       io.emit('player_left', { id: socket.id, name: p.name });
       delete players[socket.id];
+      log('info', 'player_left', { name: p.name, total: Object.keys(players).length });
     }
   });
 });
 
 function resetGame() {
   for (const p of Object.values(players)) {
-    p.score = 0; p.kills = 0; p.hp = SHIP_MAX_HP;
+    p.score = 0; p.kills = 0; p.hp = SHIP_MAX_HP; p.maxHp = SHIP_MAX_HP;
     p.isDead = false; p.invuln = 120;
-    p.x = 200 + Math.random() * (MAP - 400);
-    p.y = 200 + Math.random() * (MAP - 400);
+    const pos = getRandomPos();
+    p.x = pos.x; p.y = pos.y;
   }
   spawnAI();
   treasures = [];
+  treasuresToRespawn = [];
   for (let i = 0; i < TREASURE_COUNT; i++) treasures.push(makeTreasure());
   cannonballs.length = 0;
+  effects.length = 0;
+  gameState.wave = 0;
+  gameState.waveState = 'waiting';
+  gameState.enemiesAlive = 0;
+  gameState.totalKills = 0;
   io.emit('game_reset');
+  log('info', 'game_reset');
 }
 
+// ============================================================
+// GRACEFUL SHUTDOWN
+// ============================================================
+function shutdown(signal) {
+  log('info', 'shutdown', { signal });
+  io.emit('server_shutdown', { msg: '服务器正在重启...' });
+  io.close(() => {
+    server.close(() => {
+      log('info', 'server_closed');
+      process.exit(0);
+    });
+  });
+  // Force exit after 5s
+  setTimeout(() => process.exit(1), 5000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+process.on('uncaughtException', (err) => {
+  log('error', 'uncaughtException', { error: err.message, stack: err.stack });
+});
+
+process.on('unhandledRejection', (reason) => {
+  log('error', 'unhandledRejection', { reason: String(reason) });
+});
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    players: Object.keys(players).length,
+    ai: aiShips.length,
+    uptime: process.uptime(),
+    tick,
+  });
+});
+
+// ============================================================
+// START
+// ============================================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Pirate Battle server on port ${PORT}`);
+  log('info', 'server_started', { port: PORT, map: MAP, ai: AI_COUNT });
 });

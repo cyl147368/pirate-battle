@@ -7,446 +7,104 @@
 <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --ocean-deep: #0a1628;
-  --ocean-mid: #0f2847;
-  --ocean-light: #1a4a6e;
-  --amber: #d4a574;
-  --amber-light: #e8c9a0;
-  --amber-dark: #a07850;
-  --crimson: #c0392b;
-  --crimson-light: #e74c3c;
-  --gold: #f1c40f;
-  --gold-dark: #c9a40c;
-  --emerald: #1a6b4a;
-  --parchment: #f5e6c8;
-  --parchment-dark: #d4c4a0;
-  --wood: #5c3a1e;
-  --wood-light: #8b5e3c;
-  --text-light: #f0e6d6;
-  --text-dim: #8a7a6a;
+  --ocean-deep: #0a1628; --ocean-mid: #0f2847; --ocean-light: #1a4a6e;
+  --amber: #d4a574; --amber-light: #e8c9a0; --amber-dark: #a07850;
+  --crimson: #c0392b; --crimson-light: #e74c3c;
+  --gold: #f1c40f; --gold-dark: #c9a40c;
+  --text-light: #f0e6d6; --text-dim: #8a7a6a;
 }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--ocean-deep);color:var(--text-light);font-family:'Crimson Text',Georgia,serif;overflow:hidden;height:100vh;width:100vw}
+canvas#gameCanvas{display:block;position:absolute;top:0;left:0;z-index:1;cursor:crosshair}
+canvas#minimapCanvas{position:fixed;bottom:16px;right:16px;z-index:10;width:160px;height:160px;border:2px solid var(--amber-dark);border-radius:6px;background:rgba(10,22,40,.8);display:none}
+canvas#minimapCanvas.show{display:block}
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* Lobby */
+#lobby{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;display:flex;justify-content:center;align-items:center;background:linear-gradient(180deg,#1a0a00 0%,var(--ocean-deep) 40%,var(--ocean-mid) 100%)}
+#lobby.hidden{display:none}
+.lobby-inner{text-align:center;max-width:520px;width:90%}
+.lobby-title{font-family:'Pirata One',cursive;font-size:clamp(36px,7vw,64px);color:var(--gold);text-shadow:0 2px 0 var(--gold-dark),0 4px 20px rgba(241,196,15,.3);margin-bottom:4px;letter-spacing:2px}
+.lobby-sub{font-style:italic;font-size:clamp(14px,2.5vw,20px);color:var(--amber);margin-bottom:40px;letter-spacing:3px}
+.lobby-field{margin-bottom:28px}
+.lobby-field label{display:block;font-size:14px;color:var(--amber-light);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lobby-input{width:100%;padding:14px 20px;background:rgba(245,230,200,.08);border:1px solid var(--amber-dark);border-radius:4px;color:var(--text-light);font-family:'Crimson Text',serif;font-size:18px;text-align:center;outline:none;transition:border-color .3s,box-shadow .3s}
+.lobby-input:focus{border-color:var(--gold);box-shadow:0 0 20px rgba(241,196,15,.15)}
+.lobby-input::placeholder{color:var(--text-dim)}
+.lobby-btn{display:inline-block;padding:16px 48px;background:linear-gradient(180deg,var(--crimson-light),var(--crimson));border:2px solid #922b21;border-radius:4px;color:var(--text-light);font-family:'Pirata One',cursive;font-size:22px;letter-spacing:2px;cursor:pointer;transition:all .2s;text-shadow:0 1px 2px rgba(0,0,0,.4);box-shadow:0 4px 15px rgba(192,57,43,.4),inset 0 1px 0 rgba(255,255,255,.1)}
+.lobby-btn:hover{transform:translateY(-2px);box-shadow:0 6px 25px rgba(192,57,43,.5),inset 0 1px 0 rgba(255,255,255,.15)}
+.lobby-btn:active{transform:translateY(0)}
+.lobby-hint{margin-top:32px;font-size:14px;color:var(--text-dim);line-height:2}
+.lobby-hint kbd{display:inline-block;background:rgba(245,230,200,.1);border:1px solid var(--amber-dark);border-radius:3px;padding:1px 8px;font-family:'Crimson Text',serif;font-size:13px;color:var(--amber)}
 
-body {
-  background: var(--ocean-deep);
-  color: var(--text-light);
-  font-family: 'Crimson Text', Georgia, serif;
-  overflow: hidden;
-  height: 100vh;
-  width: 100vw;
-}
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;pointer-events:none;display:none}
+#hud.show{display:block}
+.hud-top{display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px}
+.hud-panel{background:rgba(10,22,40,.85);border:1px solid rgba(212,165,116,.2);border-radius:6px;backdrop-filter:blur(6px);padding:12px 16px;pointer-events:auto}
+.hud-label{font-size:11px;color:var(--amber-dark);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.hud-hp-bar{width:200px;height:14px;background:rgba(255,255,255,.06);border:1px solid rgba(192,57,43,.3);border-radius:3px;overflow:hidden;margin-bottom:6px}
+.hud-hp-fill{height:100%;background:linear-gradient(90deg,#922b21,var(--crimson-light));transition:width .3s;border-radius:2px}
+.hud-hp-text{font-family:'Pirata One',cursive;font-size:18px;color:var(--crimson-light)}
+.hud-score{text-align:center}
+.hud-score-val{font-family:'Pirata One',cursive;font-size:32px;color:var(--gold);text-shadow:0 0 15px rgba(241,196,15,.3)}
+.hud-wave{font-family:'Pirata One',cursive;font-size:14px;color:var(--amber);letter-spacing:1px}
+.hud-kills{font-family:'Pirata One',cursive;font-size:16px;color:var(--crimson-light)}
 
-#gameCanvas {
-  display: block;
-  position: absolute;
-  top: 0; left: 0;
-  z-index: 1;
-  cursor: crosshair;
-}
+/* Leaderboard */
+#lb{position:fixed;top:80px;right:20px;z-index:10;min-width:200px;display:none}
+#lb.show{display:block}
+.lb-title{font-family:'Pirata One',cursive;font-size:16px;color:var(--gold);margin-bottom:8px;text-align:center;letter-spacing:1px}
+.lb-row{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;font-size:14px;border-bottom:1px solid rgba(212,165,116,.1)}
+.lb-row.me{color:var(--gold);font-weight:600}
+.lb-name{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-sc{font-family:'Pirata One',cursive;font-size:15px}
 
-/* === LOBBY === */
-#lobby {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 200;
-  display: flex; justify-content: center; align-items: center;
-  background: linear-gradient(180deg, #1a0a00 0%, var(--ocean-deep) 40%, var(--ocean-mid) 100%);
-}
+/* Kill feed */
+#kf{position:fixed;top:80px;left:20px;z-index:10;width:280px;pointer-events:none}
+.kf-msg{padding:6px 12px;margin-bottom:4px;background:rgba(10,22,40,.8);border-left:3px solid var(--crimson);border-radius:0 4px 4px 0;font-size:13px;color:var(--amber-light);animation:kfIn .3s ease;transition:opacity .5s}
+@keyframes kfIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
 
-#lobby.hidden { display: none; }
+/* Wave banner */
+#waveBanner{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);z-index:50;text-align:center;pointer-events:none;opacity:0;transition:opacity .5s}
+#waveBanner.show{opacity:1}
+.wb-text{font-family:'Pirata One',cursive;font-size:56px;color:var(--gold);text-shadow:0 2px 0 var(--gold-dark),0 0 40px rgba(241,196,15,.4)}
+.wb-sub{font-size:18px;color:var(--amber);margin-top:4px}
 
-.lobby-inner {
-  text-align: center;
-  max-width: 520px;
-  width: 90%;
-}
+/* Death / Win overlay */
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(10,5,0,.85);display:none;justify-content:center;align-items:center;flex-direction:column}
+.overlay.show{display:flex}
+.overlay-title{font-family:'Pirata One',cursive;font-size:48px;color:var(--crimson-light);text-shadow:0 0 30px rgba(231,76,60,.4);margin-bottom:20px}
+.overlay-sub{font-size:20px;color:var(--amber);margin-bottom:30px}
+.overlay-btn{padding:14px 40px;background:linear-gradient(180deg,var(--ocean-light),var(--ocean-mid));border:2px solid var(--amber-dark);border-radius:4px;color:var(--amber-light);font-family:'Pirata One',cursive;font-size:20px;cursor:pointer;transition:all .2s}
+.overlay-btn:hover{border-color:var(--gold);box-shadow:0 0 20px rgba(241,196,15,.2)}
 
-.lobby-title {
-  font-family: 'Pirata One', cursive;
-  font-size: clamp(36px, 7vw, 64px);
-  color: var(--gold);
-  text-shadow: 0 2px 0 var(--gold-dark), 0 4px 20px rgba(241,196,15,0.3);
-  margin-bottom: 4px;
-  letter-spacing: 2px;
-}
+/* Controls hint */
+#hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;font-size:13px;color:var(--text-dim);letter-spacing:1px;display:none;text-align:center}
+#hint.show{display:block}
+#hint kbd{background:rgba(245,230,200,.08);border:1px solid rgba(212,165,116,.2);border-radius:3px;padding:1px 6px;font-family:'Crimson Text',serif;font-size:12px;color:var(--amber)}
 
-.lobby-subtitle {
-  font-family: 'Crimson Text', serif;
-  font-style: italic;
-  font-size: clamp(14px, 2.5vw, 20px);
-  color: var(--amber);
-  margin-bottom: 40px;
-  letter-spacing: 3px;
-}
-
-.lobby-input-group {
-  margin-bottom: 28px;
-}
-
-.lobby-input-group label {
-  display: block;
-  font-size: 14px;
-  color: var(--amber-light);
-  margin-bottom: 8px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.lobby-input {
-  width: 100%;
-  padding: 14px 20px;
-  background: rgba(245, 230, 200, 0.08);
-  border: 1px solid var(--amber-dark);
-  border-radius: 4px;
-  color: var(--text-light);
-  font-family: 'Crimson Text', serif;
-  font-size: 18px;
-  text-align: center;
-  outline: none;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.lobby-input:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 20px rgba(241, 196, 15, 0.15);
-}
-
-.lobby-input::placeholder { color: var(--text-dim); }
-
-.lobby-btn {
-  display: inline-block;
-  padding: 16px 48px;
-  background: linear-gradient(180deg, var(--crimson-light), var(--crimson));
-  border: 2px solid #922b21;
-  border-radius: 4px;
-  color: var(--text-light);
-  font-family: 'Pirata One', cursive;
-  font-size: 22px;
-  letter-spacing: 2px;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-  box-shadow: 0 4px 15px rgba(192, 57, 43, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-}
-
-.lobby-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(192, 57, 43, 0.5), inset 0 1px 0 rgba(255,255,255,0.15);
-}
-
-.lobby-btn:active { transform: translateY(0); }
-
-.lobby-controls {
-  margin-top: 32px;
-  font-size: 14px;
-  color: var(--text-dim);
-  line-height: 2;
-}
-
-.lobby-controls kbd {
-  display: inline-block;
-  background: rgba(245, 230, 200, 0.1);
-  border: 1px solid var(--amber-dark);
-  border-radius: 3px;
-  padding: 1px 8px;
-  font-family: 'Crimson Text', serif;
-  font-size: 13px;
-  color: var(--amber);
-}
-
-/* === HUD === */
-#hud {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 10;
-  pointer-events: none;
-  display: none;
-}
-
-#hud.show { display: block; }
-
-.hud-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 16px 20px;
-}
-
-.hud-panel {
-  background: rgba(10, 22, 40, 0.85);
-  border: 1px solid rgba(212, 165, 116, 0.2);
-  border-radius: 6px;
-  backdrop-filter: blur(6px);
-  padding: 12px 16px;
-  pointer-events: auto;
-}
-
-.hud-label {
-  font-size: 11px;
-  color: var(--amber-dark);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.hud-hp-bar {
-  width: 200px; height: 14px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(192,57,43,0.3);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.hud-hp-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #922b21, var(--crimson-light));
-  transition: width 0.3s;
-  border-radius: 2px;
-}
-
-.hud-hp-text {
-  font-family: 'Pirata One', cursive;
-  font-size: 18px;
-  color: var(--crimson-light);
-}
-
-.hud-score {
-  text-align: center;
-}
-
-.hud-score-value {
-  font-family: 'Pirata One', cursive;
-  font-size: 32px;
-  color: var(--gold);
-  text-shadow: 0 0 15px rgba(241,196,15,0.3);
-}
-
-.hud-wave {
-  font-family: 'Pirata One', cursive;
-  font-size: 14px;
-  color: var(--amber);
-  letter-spacing: 1px;
-}
-
-.hud-kills {
-  font-family: 'Pirata One', cursive;
-  font-size: 16px;
-  color: var(--crimson-light);
-}
-
-/* === LEADERBOARD === */
-#leaderboard {
-  position: fixed;
-  top: 80px; right: 20px;
-  z-index: 10;
-  min-width: 200px;
-  display: none;
-}
-
-#leaderboard.show { display: block; }
-
-.lb-title {
-  font-family: 'Pirata One', cursive;
-  font-size: 16px;
-  color: var(--gold);
-  margin-bottom: 8px;
-  text-align: center;
-  letter-spacing: 1px;
-}
-
-.lb-entry {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  font-size: 14px;
-  border-bottom: 1px solid rgba(212,165,116,0.1);
-}
-
-.lb-entry.self { color: var(--gold); font-weight: 600; }
-.lb-name { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-score { font-family: 'Pirata One', cursive; font-size: 15px; }
-
-/* === KILL FEED === */
-#killfeed {
-  position: fixed;
-  top: 80px; left: 20px;
-  z-index: 10;
-  width: 280px;
-  pointer-events: none;
-}
-
-.kill-msg {
-  padding: 6px 12px;
-  margin-bottom: 4px;
-  background: rgba(10, 22, 40, 0.8);
-  border-left: 3px solid var(--crimson);
-  border-radius: 0 4px 4px 0;
-  font-size: 13px;
-  color: var(--amber-light);
-  animation: killFadeIn 0.3s ease;
-  transition: opacity 0.5s;
-}
-
-@keyframes killFadeIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-/* === DEATH OVERLAY === */
-#death-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 100;
-  background: rgba(10, 5, 0, 0.85);
-  display: none;
-  justify-content: center; align-items: center; flex-direction: column;
-}
-
-#death-overlay.show { display: flex; }
-
-.death-title {
-  font-family: 'Pirata One', cursive;
-  font-size: 48px;
-  color: var(--crimson-light);
-  text-shadow: 0 0 30px rgba(231,76,60,0.4);
-  margin-bottom: 20px;
-}
-
-.death-sub {
-  font-size: 20px;
-  color: var(--amber);
-  margin-bottom: 30px;
-}
-
-.death-btn {
-  padding: 14px 40px;
-  background: linear-gradient(180deg, var(--ocean-light), var(--ocean-mid));
-  border: 2px solid var(--amber-dark);
-  border-radius: 4px;
-  color: var(--amber-light);
-  font-family: 'Pirata One', cursive;
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.death-btn:hover {
-  border-color: var(--gold);
-  box-shadow: 0 0 20px rgba(241,196,15,0.2);
-}
-
-/* === WAVE BANNER === */
-#wave-banner {
-  position: fixed;
-  top: 45%; left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 50;
-  text-align: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.5s;
-}
-
-#wave-banner.show { opacity: 1; }
-
-.wave-text {
-  font-family: 'Pirata One', cursive;
-  font-size: 56px;
-  color: var(--gold);
-  text-shadow: 0 2px 0 var(--gold-dark), 0 0 40px rgba(241,196,15,0.4);
-}
-
-.wave-sub {
-  font-size: 18px;
-  color: var(--amber);
-  margin-top: 4px;
-}
-
-/* === MINIMAP === */
-#minimap {
-  position: fixed;
-  bottom: 16px; right: 16px;
-  z-index: 10;
-  width: 160px; height: 160px;
-  border: 2px solid var(--amber-dark);
-  border-radius: 6px;
-  background: rgba(10, 22, 40, 0.8);
-  overflow: hidden;
-  display: none;
-}
-
-#minimap.show { display: block; }
-#minimapCanvas { width: 100%; height: 100%; }
-
-/* === CONTROLS HINT === */
-#controls-hint {
-  position: fixed;
-  bottom: 16px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  font-size: 13px;
-  color: var(--text-dim);
-  letter-spacing: 1px;
-  display: none;
-  text-align: center;
-}
-
-#controls-hint.show { display: block; }
-
-#controls-hint kbd {
-  background: rgba(245, 230, 200, 0.08);
-  border: 1px solid rgba(212, 165, 116, 0.2);
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-family: 'Crimson Text', serif;
-  font-size: 12px;
-  color: var(--amber);
-}
-
-/* === WIN OVERLAY === */
-#win-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 150;
-  background: rgba(10, 5, 0, 0.9);
-  display: none;
-  justify-content: center; align-items: center; flex-direction: column;
-}
-
-#win-overlay.show { display: flex; }
-
-.win-title {
-  font-family: 'Pirata One', cursive;
-  font-size: 56px;
-  color: var(--gold);
-  text-shadow: 0 2px 0 var(--gold-dark), 0 0 40px rgba(241,196,15,0.5);
-  margin-bottom: 10px;
-}
-
-.win-score {
-  font-family: 'Pirata One', cursive;
-  font-size: 28px;
-  color: var(--amber);
-  margin-bottom: 30px;
-}
+/* Win overlay */
+#winOverlay .overlay-title{color:var(--gold);text-shadow:0 2px 0 var(--gold-dark),0 0 40px rgba(241,196,15,.5);font-size:56px}
+#winOverlay .overlay-sub{font-family:'Pirata One',cursive;font-size:28px}
 </style>
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
+<canvas id="minimapCanvas" width="160" height="160"></canvas>
 
 <!-- LOBBY -->
 <div id="lobby">
   <div class="lobby-inner">
     <div class="lobby-title">海盗争霸</div>
-    <div class="lobby-subtitle">Pirate Battle</div>
-    <div class="lobby-input-group">
+    <div class="lobby-sub">Pirate Battle</div>
+    <div class="lobby-field">
       <label>你的船名</label>
       <input class="lobby-input" id="nameInput" type="text" placeholder="输入你的海盗名..." maxlength="16" autofocus>
     </div>
-    <button class="lobby-btn" id="joinBtn" onclick="joinGame()">扬帆起航</button>
-    <div class="lobby-controls">
-      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶船只 &nbsp;|&nbsp;
+    <button class="lobby-btn" onclick="joinGame()">扬帆起航</button>
+    <div class="lobby-hint">
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶 &nbsp;|&nbsp;
       <kbd>鼠标</kbd> 瞄准 &nbsp;|&nbsp; <kbd>点击</kbd> 开炮<br>
       收集宝箱得分 · 击沉敌船得分 · 先到2000分获胜
     </div>
@@ -462,617 +120,371 @@ body {
       <div class="hud-hp-text" id="hpText">100</div>
     </div>
     <div class="hud-panel hud-score">
-      <div class="hud-wave" id="waveText">第 0 波</div>
-      <div class="hud-score-value" id="scoreText">0</div>
+      <div class="hud-wave" id="waveText"></div>
+      <div class="hud-score-val" id="scoreText">0</div>
       <div class="hud-kills" id="killsText">击沉: 0</div>
     </div>
     <div class="hud-panel">
       <div class="hud-label">在线玩家</div>
-      <div class="hud-kills" id="playersText">1</div>
+      <div class="hud-kills" id="pCount">1</div>
     </div>
   </div>
 </div>
 
 <!-- LEADERBOARD -->
-<div id="leaderboard">
+<div id="lb">
   <div class="hud-panel">
     <div class="lb-title">排行榜</div>
-    <div id="lbEntries"></div>
+    <div id="lbBody"></div>
   </div>
 </div>
 
 <!-- KILL FEED -->
-<div id="killfeed"></div>
+<div id="kf"></div>
 
 <!-- WAVE BANNER -->
-<div id="wave-banner">
-  <div class="wave-text" id="bannerText"></div>
-  <div class="wave-sub" id="bannerSub"></div>
-</div>
-
-<!-- MINIMAP -->
-<div id="minimap">
-  <canvas id="minimapCanvas" width="160" height="160"></canvas>
+<div id="waveBanner">
+  <div class="wb-text" id="wbText"></div>
+  <div class="wb-sub" id="wbSub"></div>
 </div>
 
 <!-- CONTROLS HINT -->
-<div id="controls-hint">
+<div id="hint">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶 &nbsp;|&nbsp;
   <kbd>鼠标</kbd> 瞄准 &nbsp;|&nbsp; <kbd>点击/按住</kbd> 开炮 &nbsp;|&nbsp;
   <kbd>Tab</kbd> 排行榜
 </div>
 
 <!-- DEATH -->
-<div id="death-overlay">
-  <div class="death-title">船沉了...</div>
-  <div class="death-sub" id="deathSub">3秒后自动复活</div>
-  <button class="death-btn" onclick="socket.emit('restart')">重新开始</button>
+<div class="overlay" id="deathOverlay">
+  <div class="overlay-title">船沉了...</div>
+  <div class="overlay-sub">3秒后自动复活</div>
+  <button class="overlay-btn" onclick="sock.emit('restart')">重新开始</button>
 </div>
 
 <!-- WIN -->
-<div id="win-overlay">
-  <div class="win-title" id="winTitle">胜利!</div>
-  <div class="win-score" id="winScore"></div>
-  <button class="death-btn" onclick="socket.emit('restart')">再来一局</button>
+<div class="overlay" id="winOverlay">
+  <div class="overlay-title" id="winTitle">胜利!</div>
+  <div class="overlay-sub" id="winScore"></div>
+  <button class="overlay-btn" onclick="sock.emit('restart')">再来一局</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // ============================================================
-// PIRATE BATTLE - CLIENT
+// CLIENT STATE
 // ============================================================
+const C = document.getElementById('gameCanvas');
+const X = C.getContext('2d');
+const MC = document.getElementById('minimapCanvas');
+const MX = MC.getContext('2d');
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const miniCanvas = document.getElementById('minimapCanvas');
-const miniCtx = miniCanvas.getContext('2d');
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// ============================================================
-// STATE
-// ============================================================
-let socket = null;
-let myId = null;
-let mapSize = 3000;
-let islands = [];
-let gameState = null;
-let camera = { x: 0, y: 0 };
+let sock = null, myId = null, mapSize = 3000, islands = [];
+let gs = null; // game state from server
+let cam = { x: 0, y: 0 };
 let mouse = { x: 0, y: 0, down: false };
 let keys = {};
-let showTab = false;
-let killMessages = [];
-let waveBannerTimer = 0;
+let killMsgs = [];
+let wbTimer = 0;
+let lastHp = 100;
+
+function resize() { C.width = innerWidth; C.height = innerHeight; }
+addEventListener('resize', resize); resize();
 
 // ============================================================
 // INPUT
 // ============================================================
-document.addEventListener('keydown', e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key === 'Tab') { e.preventDefault(); showTab = true; }
-});
-document.addEventListener('keyup', e => {
-  keys[e.key.toLowerCase()] = false;
-  if (e.key === 'Tab') showTab = false;
-});
-canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-canvas.addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; });
-canvas.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
-canvas.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key === 'Tab') e.preventDefault(); });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+C.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+C.addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; });
+C.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+C.addEventListener('contextmenu', e => e.preventDefault());
 
 // ============================================================
 // JOIN
 // ============================================================
-document.getElementById('nameInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') joinGame();
-});
+document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
 
 function joinGame() {
   const name = document.getElementById('nameInput').value.trim() || '无名海盗';
-  socket = io();
+  sock = io();
 
-  socket.on('joined', data => {
-    myId = data.id;
-    mapSize = data.mapSize;
-    islands = data.islands;
+  sock.on('joined', d => {
+    myId = d.id; mapSize = d.mapSize; islands = d.islands;
     document.getElementById('lobby').classList.add('hidden');
     document.getElementById('hud').classList.add('show');
-    document.getElementById('leaderboard').classList.add('show');
-    document.getElementById('minimap').classList.add('show');
-    document.getElementById('controls-hint').classList.add('show');
-    requestAnimationFrame(gameLoop);
+    document.getElementById('lb').classList.add('show');
+    MC.classList.add('show');
+    document.getElementById('hint').classList.add('show');
+    requestAnimationFrame(loop);
   });
 
-  socket.on('state', data => { gameState = data; });
+  sock.on('state', d => { gs = decode(d); });
 
-  socket.on('wave_start', data => {
-    showWaveBanner(data.wave, data.isBoss ? `BOSS: ${data.bossName}` : '准备迎战!');
+  sock.on('wave_start', d => { showBanner('第 ' + d.wave + ' 波', d.isBoss ? 'BOSS: ' + d.bossName : '准备迎战!'); });
+  sock.on('wave_complete', d => { showBanner('第 ' + d.wave + ' 波', '波次清除!'); });
+  sock.on('player_died', d => {
+    if (d.id === myId) document.getElementById('deathOverlay').classList.add('show');
+    const p = gs?.players?.[d.id];
+    if (p) addKF(p.name + ' 沉没了');
   });
-
-  socket.on('wave_complete', data => {
-    showWaveBanner(data.wave, '波次清除!');
+  sock.on('player_respawn', d => { if (d.id === myId) document.getElementById('deathOverlay').classList.remove('show'); });
+  sock.on('player_joined', d => { addKF(d.name + ' 加入了战场'); });
+  sock.on('player_left', d => { addKF(d.name + ' 离开了'); });
+  sock.on('game_over', d => { showBanner('游戏结束', '总击杀: ' + d.totalKills); });
+  sock.on('winner', d => {
+    document.getElementById('winOverlay').classList.add('show');
+    document.getElementById('winTitle').textContent = d.name + ' 获胜!';
+    document.getElementById('winScore').textContent = '得分: ' + d.score;
   });
-
-  socket.on('player_died', data => {
-    if (data.id === myId) {
-      document.getElementById('death-overlay').classList.add('show');
-    }
-    const p = gameState?.players?.[data.id];
-    if (p) addKillMessage(`${p.name} 沉没了`);
+  sock.on('game_reset', () => {
+    document.getElementById('deathOverlay').classList.remove('show');
+    document.getElementById('winOverlay').classList.remove('show');
   });
+  sock.on('server_shutdown', () => { addKF('服务器正在重启...'); });
+  sock.on('error_msg', d => { addKF(d.msg); });
 
-  socket.on('player_respawn', data => {
-    if (data.id === myId) {
-      document.getElementById('death-overlay').classList.remove('show');
-    }
-  });
+  sock.emit('join', { name });
+}
 
-  socket.on('player_joined', data => {
-    addKillMessage(`${data.name} 加入了战场`);
-  });
-
-  socket.on('player_left', data => {
-    addKillMessage(`${data.name} 离开了`);
-  });
-
-  socket.on('level_up', data => {
-    if (data.id === myId) addKillMessage(`升级! 等级 ${data.level}`);
-  });
-
-  socket.on('game_over', data => {
-    showWaveBanner(data.wave, `游戏结束! 击杀: ${data.totalKills}`);
-  });
-
-  socket.on('winner', data => {
-    document.getElementById('win-overlay').classList.add('show');
-    document.getElementById('winTitle').textContent = `${data.name} 获胜!`;
-    document.getElementById('winScore').textContent = `得分: ${data.score}`;
-  });
-
-  socket.on('game_reset', () => {
-    document.getElementById('death-overlay').classList.remove('show');
-    document.getElementById('win-overlay').classList.remove('show');
-  });
-
-  socket.emit('join', { name });
+// ============================================================
+// DECODE COMPACT STATE
+// ============================================================
+function decode(s) {
+  const players = {};
+  for (const [id, p] of Object.entries(s.p)) {
+    players[id] = {
+      id: p.id, name: p.n, x: p.x, y: p.y, angle: p.a,
+      vx: p.vx, vy: p.vy, hp: p.hp, maxHp: p.mhp, color: p.c,
+      score: p.sc, kills: p.kl, isDead: !!p.d, respawnTimer: p.rt, invuln: p.inv, damage: p.dmg,
+    };
+  }
+  return {
+    players,
+    ai: s.a.map(a => ({
+      id: a.id, name: a.n, x: a.x, y: a.y, angle: a.a,
+      hp: a.hp, maxHp: a.mhp, color: a.c, score: a.sc, isDead: !!a.d, invuln: a.inv,
+    })),
+    cannonballs: s.b.map(b => ({ x: b.x, y: b.y })),
+    treasures: s.t.map(t => ({ x: t.x, y: t.y, id: t.id })),
+    effects: s.e.map(e => ({ type: e.t, x: e.x, y: e.y, life: e.l })),
+    tick: s.k, mapSize: s.ms,
+  };
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
-function showWaveBanner(wave, sub) {
-  document.getElementById('bannerText').textContent = `第 ${wave} 波`;
-  document.getElementById('bannerSub').textContent = sub;
-  document.getElementById('wave-banner').classList.add('show');
-  waveBannerTimer = 120;
+function showBanner(text, sub) {
+  document.getElementById('wbText').textContent = text;
+  document.getElementById('wbSub').textContent = sub;
+  document.getElementById('waveBanner').classList.add('show');
+  wbTimer = 120;
 }
-
-function addKillMessage(msg) {
-  killMessages.unshift({ text: msg, life: 180 });
-  if (killMessages.length > 5) killMessages.pop();
-}
-
-function screenShake(intensity) {
-  canvas.style.transform = `translate(${(Math.random()-0.5)*intensity}px, ${(Math.random()-0.5)*intensity}px)`;
-  setTimeout(() => canvas.style.transform = '', 80);
-}
+function addKF(msg) { killMsgs.unshift({ text: msg, life: 180 }); if (killMsgs.length > 5) killMsgs.pop(); }
+function shake(n) { C.style.transform = 'translate(' + ((Math.random()-.5)*n) + 'px,' + ((Math.random()-.5)*n) + 'px)'; setTimeout(() => C.style.transform = '', 80); }
 
 // ============================================================
 // MAIN LOOP
 // ============================================================
-let lastHp = 100;
-
-function gameLoop() {
-  requestAnimationFrame(gameLoop);
-  if (!gameState || !myId) return;
-
-  const me = gameState.players[myId];
+function loop() {
+  requestAnimationFrame(loop);
+  if (!gs || !myId) return;
+  const me = gs.players[myId];
   if (!me) return;
 
   // Send input
-  const aimAngle = Math.atan2(mouse.y - canvas.height/2, mouse.x - canvas.width/2);
-  socket.emit('input', {
-    w: keys['w'] || false,
-    a: keys['a'] || false,
-    s: keys['s'] || false,
-    d: keys['d'] || false,
-    shoot: mouse.down,
-    aimAngle,
-  });
+  const aim = Math.atan2(mouse.y - C.height/2, mouse.x - C.width/2);
+  sock.emit('input', { w: keys.w||false, a: keys.a||false, s: keys.s||false, d: keys.d||false, shoot: mouse.down, aimAngle: aim });
 
   // Camera
-  camera.x += (me.x - canvas.width/2 - camera.x) * 0.12;
-  camera.y += (me.y - canvas.height/2 - camera.y) * 0.12;
+  cam.x += (me.x - C.width/2 - cam.x) * 0.12;
+  cam.y += (me.y - C.height/2 - cam.y) * 0.12;
 
-  // HP change shake
-  if (me.hp < lastHp - 5) screenShake(6);
+  // Shake on HP drop
+  if (me.hp < lastHp - 5) shake(6);
   lastHp = me.hp;
 
   // Wave banner
-  if (waveBannerTimer > 0) {
-    waveBannerTimer--;
-    if (waveBannerTimer <= 0) {
-      document.getElementById('wave-banner').classList.remove('show');
-    }
-  }
+  if (wbTimer > 0) { wbTimer--; if (wbTimer <= 0) document.getElementById('waveBanner').classList.remove('show'); }
 
-  // Kill feed
-  for (let i = killMessages.length - 1; i >= 0; i--) {
-    killMessages[i].life--;
-    if (killMessages[i].life <= 0) killMessages.splice(i, 1);
-  }
+  // Kill feed decay
+  for (let i = killMsgs.length - 1; i >= 0; i--) { killMsgs[i].life--; if (killMsgs[i].life <= 0) killMsgs.splice(i, 1); }
 
-  // Update HUD
-  document.getElementById('hpFill').style.width = `${(me.hp / me.maxHp) * 100}%`;
+  // HUD
+  document.getElementById('hpFill').style.width = (me.hp / me.maxHp * 100) + '%';
   document.getElementById('hpText').textContent = Math.ceil(me.hp);
   document.getElementById('scoreText').textContent = me.score;
-  document.getElementById('killsText').textContent = `击沉: ${me.kills}`;
-  document.getElementById('playersText').textContent = Object.keys(gameState.players).length;
+  document.getElementById('killsText').textContent = '击沉: ' + me.kills;
+  document.getElementById('pCount').textContent = Object.keys(gs.players).length;
 
-  // Render
   render();
   renderMinimap();
-  renderHUD();
 }
 
 // ============================================================
 // RENDER
 // ============================================================
-function render() {
-  const w = canvas.width, h = canvas.height;
-  const cx = camera.x, cy = camera.y;
-  const me = gameState.players[myId];
-
-  // Sky gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.4);
-  skyGrad.addColorStop(0, '#1a0a00');
-  skyGrad.addColorStop(0.5, '#2d1810');
-  skyGrad.addColorStop(1, '#0f2847');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, w, h);
-
-  // Ocean
-  const oceanGrad = ctx.createLinearGradient(0, h * 0.3, 0, h);
-  oceanGrad.addColorStop(0, '#0f2847');
-  oceanGrad.addColorStop(1, '#0a1628');
-  ctx.fillStyle = oceanGrad;
-  ctx.fillRect(0, h * 0.3, w, h * 0.7);
-
-  // Horizon line
-  ctx.strokeStyle = 'rgba(212, 165, 116, 0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, h * 0.35);
-  ctx.lineTo(w, h * 0.35);
-  ctx.stroke();
-
-  // Grid (ocean)
-  ctx.strokeStyle = 'rgba(26, 74, 110, 0.15)';
-  ctx.lineWidth = 1;
-  const gridSize = 100;
-  const startX = -cx % gridSize;
-  const startY = -cy % gridSize;
-  for (let x = startX; x < w; x += gridSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = startY; y < h; y += gridSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-
-  // Islands
-  for (const isl of islands) {
-    const sx = isl.x - cx, sy = isl.y - cy;
-    if (sx < -200 || sx > w + 200 || sy < -200 || sy > h + 200) continue;
-
-    // Island shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath();
-    ctx.ellipse(sx + 4, sy + 6, isl.r * 1.1, isl.r * 0.6, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Island body
-    const islGrad = ctx.createRadialGradient(sx - isl.r * 0.2, sy - isl.r * 0.2, 0, sx, sy, isl.r);
-    islGrad.addColorStop(0, '#5c8a3c');
-    islGrad.addColorStop(0.6, '#3d6b2a');
-    islGrad.addColorStop(1, '#2a4f1a');
-    ctx.fillStyle = islGrad;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, isl.r, isl.r * 0.55, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Beach ring
-    ctx.strokeStyle = '#c9a96e';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, isl.r + 4, isl.r * 0.55 + 3, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // Treasures
-  for (const t of gameState.treasures) {
-    const sx = t.x - cx, sy = t.y - cy;
-    if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
-    const pulse = 1 + Math.sin(gameState.tick * 0.05 + t.id) * 0.15;
-
-    // Glow
-    ctx.shadowColor = '#f1c40f';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(sx - 8 * pulse, sy - 6 * pulse, 16 * pulse, 12 * pulse);
-    ctx.fillStyle = '#8b6914';
-    ctx.fillRect(sx - 2, sy - 6 * pulse, 4, 12 * pulse);
-    ctx.shadowBlur = 0;
-  }
-
-  // Cannonballs
-  for (const b of gameState.cannonballs) {
-    const sx = b.x - cx, sy = b.y - cy;
-    ctx.fillStyle = '#2c2c2c';
-    ctx.shadowColor = '#ff6600';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-
-  // AI ships
-  for (const s of gameState.ai) {
-    drawShip(s, cx, cy, false);
-  }
-
-  // Player ships
-  for (const s of Object.values(gameState.players)) {
-    drawShip(s, cx, cy, s.id === myId);
-  }
-
-  // Effects
-  for (const e of gameState.effects) {
-    const sx = e.x - cx, sy = e.y - cy;
-    const alpha = e.life / (e.type === 'sink' ? 30 : 15);
-    if (e.type === 'hit') {
-      ctx.fillStyle = `rgba(255, 140, 0, ${alpha})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 15 * (1 - alpha) + 5, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (e.type === 'sink') {
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 30 * (1 - alpha), 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (e.type === 'collect') {
-      ctx.fillStyle = `rgba(241, 196, 15, ${alpha})`;
-      ctx.font = '18px "Pirata One"';
-      ctx.textAlign = 'center';
-      ctx.fillText('+50', sx, sy - 10 * (1 - alpha));
-    }
-  }
-
-  // Aim crosshair
-  const aimX = mouse.x, aimY = mouse.y;
-  ctx.strokeStyle = 'rgba(212, 165, 116, 0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(aimX, aimY, 12, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(aimX - 18, aimY); ctx.lineTo(aimX - 6, aimY);
-  ctx.moveTo(aimX + 6, aimY); ctx.lineTo(aimX + 18, aimY);
-  ctx.moveTo(aimX, aimY - 18); ctx.lineTo(aimX, aimY - 6);
-  ctx.moveTo(aimX, aimY + 6); ctx.lineTo(aimX, aimY + 18);
-  ctx.stroke();
-
-  // Kill feed
-  const feedEl = document.getElementById('killfeed');
-  feedEl.innerHTML = '';
-  for (const km of killMessages) {
-    const div = document.createElement('div');
-    div.className = 'kill-msg';
-    div.textContent = km.text;
-    div.style.opacity = km.life / 180;
-    feedEl.appendChild(div);
-  }
-
-  // Tab leaderboard
-  const lbEl = document.getElementById('lbEntries');
-  const allPlayers = [
-    ...Object.values(gameState.players).map(p => ({ name: p.name, score: p.score, id: p.id, color: p.color })),
-    ...gameState.ai.map(a => ({ name: a.name, score: a.score, id: a.id, color: '#555' })),
-  ].sort((a, b) => b.score - a.score);
-
-  lbEl.innerHTML = '';
-  for (const p of allPlayers.slice(0, 8)) {
-    const div = document.createElement('div');
-    div.className = 'lb-entry' + (p.id === myId ? ' self' : '');
-    div.innerHTML = `<span class="lb-name" style="color:${p.color}">${p.name}</span><span class="lb-score">${p.score}</span>`;
-    lbEl.appendChild(div);
-  }
-}
-
 function drawShip(s, cx, cy, isMe) {
   if (s.isDead) return;
   const sx = s.x - cx, sy = s.y - cy;
-  if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 60) return;
-
+  if (sx < -60 || sx > C.width+60 || sy < -60 || sy > C.height+60) return;
   const flash = s.hitTimer > 0;
-  const color = flash ? '#ffffff' : s.color;
-
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.rotate(s.angle);
-
-  // Hull shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(3, 4, 26, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
+  const col = flash ? '#fff' : s.color;
+  X.save(); X.translate(sx, sy); X.rotate(s.angle);
+  // Shadow
+  X.fillStyle = 'rgba(0,0,0,.3)';
+  X.beginPath(); X.ellipse(3, 4, 26, 12, 0, 0, Math.PI*2); X.fill();
   // Hull
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(28, 0);
-  ctx.quadraticCurveTo(20, -14, -10, -12);
-  ctx.lineTo(-22, -6);
-  ctx.quadraticCurveTo(-28, 0, -22, 6);
-  ctx.lineTo(-10, 12);
-  ctx.quadraticCurveTo(20, 14, 28, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  // Deck line
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(20, 0);
-  ctx.lineTo(-18, 0);
-  ctx.stroke();
-
+  X.fillStyle = col;
+  X.beginPath();
+  X.moveTo(28,0); X.quadraticCurveTo(20,-14,-10,-12); X.lineTo(-22,-6);
+  X.quadraticCurveTo(-28,0,-22,6); X.lineTo(-10,12); X.quadraticCurveTo(20,14,28,0);
+  X.closePath(); X.fill();
+  // Deck
+  X.strokeStyle = 'rgba(0,0,0,.2)'; X.lineWidth = 1;
+  X.beginPath(); X.moveTo(20,0); X.lineTo(-18,0); X.stroke();
   // Mast
-  ctx.fillStyle = '#3a2510';
-  ctx.fillRect(-2, -18, 4, 36);
-
+  X.fillStyle = '#3a2510'; X.fillRect(-2,-18,4,36);
   // Sail
-  ctx.fillStyle = 'rgba(245, 230, 200, 0.85)';
-  ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.quadraticCurveTo(14, -8, 14, 0);
-  ctx.quadraticCurveTo(14, 8, 0, 16);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(160, 120, 80, 0.4)';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-
+  X.fillStyle = 'rgba(245,230,200,.85)';
+  X.beginPath(); X.moveTo(0,-16); X.quadraticCurveTo(14,-8,14,0); X.quadraticCurveTo(14,8,0,16); X.closePath(); X.fill();
   // Flag
-  ctx.fillStyle = s.isAI ? '#888' : (s.color || '#c0392b');
-  ctx.beginPath();
-  ctx.moveTo(0, -18);
-  ctx.lineTo(-10, -14);
-  ctx.lineTo(0, -10);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-
+  X.fillStyle = s.isAI ? '#888' : (s.color || '#c0392b');
+  X.beginPath(); X.moveTo(0,-18); X.lineTo(-10,-14); X.lineTo(0,-10); X.closePath(); X.fill();
+  X.restore();
   // HP bar
   if (s.hp < s.maxHp) {
-    const barW = 40;
-    const barH = 4;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(sx - barW/2, sy - 28, barW, barH);
-    const hpRatio = s.hp / s.maxHp;
-    ctx.fillStyle = hpRatio > 0.5 ? '#27ae60' : hpRatio > 0.25 ? '#f39c12' : '#c0392b';
-    ctx.fillRect(sx - barW/2, sy - 28, barW * hpRatio, barH);
+    const bw = 40, bh = 4, r = s.hp / s.maxHp;
+    X.fillStyle = 'rgba(0,0,0,.5)'; X.fillRect(sx-bw/2, sy-28, bw, bh);
+    X.fillStyle = r > .5 ? '#27ae60' : r > .25 ? '#f39c12' : '#c0392b';
+    X.fillRect(sx-bw/2, sy-28, bw*r, bh);
   }
-
   // Name
-  ctx.font = '12px "Crimson Text"';
-  ctx.fillStyle = isMe ? '#f1c40f' : 'rgba(240,230,214,0.7)';
-  ctx.textAlign = 'center';
-  ctx.fillText(s.name, sx, sy + 24);
+  X.font = '12px "Crimson Text"'; X.textAlign = 'center';
+  X.fillStyle = isMe ? '#f1c40f' : 'rgba(240,230,214,.7)';
+  X.fillText(s.name, sx, sy+24);
+  // Invuln
+  if (s.invuln > 0) { X.strokeStyle = 'rgba(241,196,15,.3)'; X.lineWidth = 2; X.beginPath(); X.arc(sx,sy,30,0,Math.PI*2); X.stroke(); }
+}
 
-  // Invuln glow
-  if (s.invuln > 0) {
-    ctx.strokeStyle = 'rgba(241, 196, 15, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 30, 0, Math.PI * 2);
-    ctx.stroke();
+function render() {
+  const w = C.width, h = C.height, cx = cam.x, cy = cam.y;
+  // Sky
+  const sg = X.createLinearGradient(0,0,0,h*.4);
+  sg.addColorStop(0,'#1a0a00'); sg.addColorStop(.5,'#2d1810'); sg.addColorStop(1,'#0f2847');
+  X.fillStyle = sg; X.fillRect(0,0,w,h);
+  // Ocean
+  const og = X.createLinearGradient(0,h*.3,0,h);
+  og.addColorStop(0,'#0f2847'); og.addColorStop(1,'#0a1628');
+  X.fillStyle = og; X.fillRect(0,h*.3,w,h*.7);
+  // Horizon
+  X.strokeStyle = 'rgba(212,165,116,.15)'; X.lineWidth = 1;
+  X.beginPath(); X.moveTo(0,h*.35); X.lineTo(w,h*.35); X.stroke();
+  // Grid
+  X.strokeStyle = 'rgba(26,74,110,.15)'; X.lineWidth = 1;
+  const gs = 100, sx0 = -cx%gs, sy0 = -cy%gs;
+  for (let x=sx0;x<w;x+=gs){X.beginPath();X.moveTo(x,0);X.lineTo(x,h);X.stroke();}
+  for (let y=sy0;y<h;y+=gs){X.beginPath();X.moveTo(0,y);X.lineTo(w,y);X.stroke();}
+
+  // Islands
+  for (const isl of islands) {
+    const ix=isl.x-cx, iy=isl.y-cy;
+    if (ix<-200||ix>w+200||iy<-200||iy>h+200) continue;
+    X.fillStyle='rgba(0,0,0,.2)'; X.beginPath(); X.ellipse(ix+4,iy+6,isl.r*1.1,isl.r*.6,0,0,Math.PI*2); X.fill();
+    const ig=X.createRadialGradient(ix-isl.r*.2,iy-isl.r*.2,0,ix,iy,isl.r);
+    ig.addColorStop(0,'#5c8a3c'); ig.addColorStop(.6,'#3d6b2a'); ig.addColorStop(1,'#2a4f1a');
+    X.fillStyle=ig; X.beginPath(); X.ellipse(ix,iy,isl.r,isl.r*.55,0,0,Math.PI*2); X.fill();
+    X.strokeStyle='#c9a96e'; X.lineWidth=4; X.beginPath(); X.ellipse(ix,iy,isl.r+4,isl.r*.55+3,0,0,Math.PI*2); X.stroke();
   }
+
+  // Treasures
+  for (const t of gs.treasures) {
+    const tx=t.x-cx, ty=t.y-cy;
+    if (tx<-30||tx>w+30||ty<-30||ty>h+30) continue;
+    const p=1+Math.sin(gs.tick*.05+t.id)*.15;
+    X.shadowColor='#f1c40f'; X.shadowBlur=12;
+    X.fillStyle='#f1c40f'; X.fillRect(tx-8*p,ty-6*p,16*p,12*p);
+    X.fillStyle='#8b6914'; X.fillRect(tx-2,ty-6*p,4,12*p);
+    X.shadowBlur=0;
+  }
+
+  // Cannonballs
+  for (const b of gs.cannonballs) {
+    const bx=b.x-cx, by=b.y-cy;
+    X.fillStyle='#2c2c2c'; X.shadowColor='#ff6600'; X.shadowBlur=6;
+    X.beginPath(); X.arc(bx,by,4,0,Math.PI*2); X.fill(); X.shadowBlur=0;
+  }
+
+  // AI ships
+  for (const s of gs.ai) drawShip(s, cx, cy, false);
+  // Player ships
+  for (const s of Object.values(gs.players)) drawShip(s, cx, cy, s.id === myId);
+
+  // Effects
+  for (const e of gs.effects) {
+    const ex=e.x-cx, ey=e.y-cy, a=e.life/(e.type==='sink'?30:15);
+    if (e.type==='hit') { X.fillStyle='rgba(255,140,0,'+a+')'; X.beginPath(); X.arc(ex,ey,15*(1-a)+5,0,Math.PI*2); X.fill(); }
+    else if (e.type==='sink') { X.strokeStyle='rgba(255,255,255,'+a+')'; X.lineWidth=2; X.beginPath(); X.arc(ex,ey,30*(1-a),0,Math.PI*2); X.stroke(); }
+    else if (e.type==='collect') { X.fillStyle='rgba(241,196,15,'+a+')'; X.font='18px "Pirata One"'; X.textAlign='center'; X.fillText('+50',ex,ey-10*(1-a)); }
+  }
+
+  // Crosshair
+  X.strokeStyle='rgba(212,165,116,.6)'; X.lineWidth=1.5;
+  X.beginPath(); X.arc(mouse.x,mouse.y,12,0,Math.PI*2); X.stroke();
+  X.beginPath(); X.moveTo(mouse.x-18,mouse.y);X.lineTo(mouse.x-6,mouse.y);X.moveTo(mouse.x+6,mouse.y);X.lineTo(mouse.x+18,mouse.y);X.moveTo(mouse.x,mouse.y-18);X.lineTo(mouse.x,mouse.y-6);X.moveTo(mouse.x,mouse.y+6);X.lineTo(mouse.x,mouse.y+18);X.stroke();
+
+  // Kill feed
+  const kfEl = document.getElementById('kf');
+  kfEl.innerHTML = '';
+  for (const km of killMsgs) { const d=document.createElement('div'); d.className='kf-msg'; d.textContent=km.text; d.style.opacity=km.life/180; kfEl.appendChild(d); }
+
+  // Leaderboard
+  const all = [
+    ...Object.values(gs.players).map(p=>({name:p.name,score:p.score,id:p.id,color:p.color})),
+    ...gs.ai.map(a=>({name:a.name,score:a.score,id:a.id,color:'#555'})),
+  ].sort((a,b)=>b.score-a.score);
+  const lbEl = document.getElementById('lbBody');
+  lbEl.innerHTML = '';
+  for (const p of all.slice(0,8)) {
+    const d=document.createElement('div'); d.className='lb-row'+(p.id===myId?' me':'');
+    d.innerHTML='<span class="lb-name" style="color:'+p.color+'">'+p.name+'</span><span class="lb-sc">'+p.score+'</span>';
+    lbEl.appendChild(d);
+  }
+
+  // Compass
+  const ccx=C.width/2, ccy=C.height-60, r=25;
+  const me=gs.players[myId]; if(!me) return;
+  X.save(); X.globalAlpha=.4; X.strokeStyle='#d4a574'; X.lineWidth=1.5;
+  X.beginPath(); X.arc(ccx,ccy,r,0,Math.PI*2); X.stroke();
+  X.font='10px "Crimson Text"'; X.fillStyle='#d4a574'; X.textAlign='center';
+  X.fillText('N',ccx,ccy-r-4); X.fillText('S',ccx,ccy+r+12); X.fillText('E',ccx+r+8,ccy+4); X.fillText('W',ccx-r-8,ccy+4);
+  X.globalAlpha=.7; X.strokeStyle='#f1c40f'; X.lineWidth=2;
+  X.beginPath(); X.moveTo(ccx,ccy); X.lineTo(ccx+Math.cos(me.angle)*(r-4),ccy+Math.sin(me.angle)*(r-4)); X.stroke();
+  X.restore();
 }
 
 // ============================================================
 // MINIMAP
 // ============================================================
 function renderMinimap() {
-  const mw = 160, mh = 160;
-  const scale = mw / mapSize;
-
-  miniCtx.fillStyle = 'rgba(10, 22, 40, 0.9)';
-  miniCtx.fillRect(0, 0, mw, mh);
-
-  // Islands
-  miniCtx.fillStyle = 'rgba(93, 138, 60, 0.5)';
-  for (const isl of islands) {
-    miniCtx.beginPath();
-    miniCtx.arc(isl.x * scale, isl.y * scale, isl.r * scale, 0, Math.PI * 2);
-    miniCtx.fill();
-  }
-
-  // Treasures
-  miniCtx.fillStyle = '#f1c40f';
-  for (const t of gameState.treasures) {
-    miniCtx.fillRect(t.x * scale - 2, t.y * scale - 2, 4, 4);
-  }
-
-  // AI
-  miniCtx.fillStyle = '#888';
-  for (const s of gameState.ai) {
-    if (!s.isDead) miniCtx.fillRect(s.x * scale - 2, s.y * scale - 2, 4, 4);
-  }
-
-  // Players
-  for (const p of Object.values(gameState.players)) {
+  const mw=160, sc=mw/mapSize;
+  MX.fillStyle='rgba(10,22,40,.9)'; MX.fillRect(0,0,mw,mw);
+  MX.fillStyle='rgba(93,138,60,.5)';
+  for (const isl of islands) { MX.beginPath(); MX.arc(isl.x*sc,isl.y*sc,isl.r*sc,0,Math.PI*2); MX.fill(); }
+  MX.fillStyle='#f1c40f';
+  for (const t of gs.treasures) MX.fillRect(t.x*sc-2,t.y*sc-2,4,4);
+  MX.fillStyle='#888';
+  for (const s of gs.ai) if(!s.isDead) MX.fillRect(s.x*sc-2,s.y*sc-2,4,4);
+  for (const p of Object.values(gs.players)) {
     if (p.isDead) continue;
-    miniCtx.fillStyle = p.id === myId ? '#f1c40f' : p.color;
-    const size = p.id === myId ? 5 : 3;
-    miniCtx.fillRect(p.x * scale - size/2, p.y * scale - size/2, size, size);
+    MX.fillStyle = p.id===myId ? '#f1c40f' : p.color;
+    const sz = p.id===myId ? 5 : 3;
+    MX.fillRect(p.x*sc-sz/2, p.y*sc-sz/2, sz, sz);
   }
-
-  // Camera view
-  miniCtx.strokeStyle = 'rgba(255,255,255,0.3)';
-  miniCtx.lineWidth = 1;
-  miniCtx.strokeRect(
-    camera.x * scale, camera.y * scale,
-    canvas.width * scale, canvas.height * scale
-  );
-}
-
-// ============================================================
-// HUD (Canvas-drawn)
-// ============================================================
-function renderHUD() {
-  // Compass at bottom center
-  const cx = canvas.width / 2, cy = canvas.height - 60;
-  const r = 25;
-  const me = gameState.players[myId];
-  if (!me) return;
-
-  ctx.save();
-  ctx.globalAlpha = 0.4;
-
-  // Compass circle
-  ctx.strokeStyle = '#d4a574';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // N/S/E/W
-  ctx.font = '10px "Crimson Text"';
-  ctx.fillStyle = '#d4a574';
-  ctx.textAlign = 'center';
-  ctx.fillText('N', cx, cy - r - 4);
-  ctx.fillText('S', cx, cy + r + 12);
-  ctx.fillText('E', cx + r + 8, cy + 4);
-  ctx.fillText('W', cx - r - 8, cy + 4);
-
-  // Ship direction
-  ctx.globalAlpha = 0.7;
-  ctx.strokeStyle = '#f1c40f';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + Math.cos(me.angle) * (r - 4), cy + Math.sin(me.angle) * (r - 4));
-  ctx.stroke();
-
-  ctx.restore();
+  MX.strokeStyle='rgba(255,255,255,.3)'; MX.lineWidth=1;
+  MX.strokeRect(cam.x*sc, cam.y*sc, C.width*sc, C.height*sc);
 }
 </script>
 </body>
